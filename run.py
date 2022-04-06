@@ -1,6 +1,9 @@
 import shift
 from time import sleep
 import datetime as dt
+from threading import Thread
+
+STOCK_LIST =['AAPL', 'AXP', 'BA', 'CAT', 'CSCO', 'CVX', 'DIA', 'DIS', 'GS', 'HD', 'IBM', 'INTC', 'JNJ', 'JPM', 'KO', 'MCD', 'MMM', 'MRK', 'MSFT', 'NKE', 'PFE', 'PG', 'SPY', 'TRV', 'UNH', 'V', 'VZ', 'WBA', 'WMT', 'XOM']
 
 
 def connect(username, password):
@@ -17,19 +20,29 @@ def connect(username, password):
 def market_open(trader):
     d = trader.get_last_trade_time()
     start_time = dt.time(9,30,0)
-    print(" trade time :", start_time < trader.get_last_trade_time().time() )
+    print("Trading good to start :", start_time < trader.get_last_trade_time().time() )
     while start_time > trader.get_last_trade_time().time():
          print("Market not yet open at ", trader.get_last_trade_time())
          sleep(10)
     return True
          
 
+def buy_stocks(trader, stock):
+    limit_buy = shift.Order(shift.Order.Type.LIMIT_BUY, stock, 1, 10.00)
+    trader.submit_order(limit_buy)
+         
 def start_trading(trader):
-     if trader.is_connected():
+    thread_list=[]
+    if trader.is_connected():
          trader.sub_all_order_book()
-         trader.get_subscribed_order_book_list()
-         limit_buy = shift.Order(shift.Order.Type.LIMIT_BUY, "AAPL", 1, 10.00)
-         trader.submit_order(limit_buy)
+         sleep(10)
+         #Spawn individual tracking process for each stock
+         for stock in STOCK_LIST:
+             t = Thread(target= buy_stocks,args=(trader, stock))         
+             thread_list.append(t)
+             t.start()
+ 
+         sleep(10) 
          print("Buying Power\tTotal Shares\tTotal P&L\tTimestamp")
          print("%12.2f\t%12d\t%9.2f\t%26s"
          % (
@@ -52,9 +65,13 @@ def start_trading(trader):
              )
          )
          print("Waiting list orders :", trader.get_waiting_list())
-         return 
+
          for order in trader.get_waiting_list():
              trader.submit_cancellation(order)
+         for t in thread_list:
+             t.join()
+         return
+
 
  
 def conclude():
