@@ -1,4 +1,4 @@
-import shift
+import shift, time
 from time import sleep
 import datetime as dt
 from threading import Thread
@@ -32,8 +32,10 @@ def buy_stocks(trader, stock):
     trader.submit_order(limit_buy)
          
 def start_trading(trader):
-    thread_list=[]
-    if trader.is_connected():
+    t0= time.time()
+    while True:
+       thread_list=[]
+       if trader.is_connected():
          trader.sub_all_order_book()
          sleep(10)
          #Spawn individual tracking process for each stock
@@ -66,11 +68,14 @@ def start_trading(trader):
          )
          print("Waiting list orders :", trader.get_waiting_list())
 
-         for order in trader.get_waiting_list():
-             trader.submit_cancellation(order)
          for t in thread_list:
              t.join()
-         return
+         if (time.time()-t0==30): #timer to execute during the stock market is open   
+             break
+    print("Waiting list orders :", trader.get_waiting_list())
+    for order in trader.get_waiting_list():
+             trader.submit_cancellation(order)
+    return  
 
 
  
