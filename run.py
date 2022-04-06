@@ -1,5 +1,6 @@
 import sys
 import shift
+import time
 
 print("lising Shitf details:", dir(shift))
 
@@ -14,6 +15,7 @@ def main(argv):
         trader.connect("initiator.cfg", "crT4Y3w9")
         
         trader.sub_all_order_book()
+        time.sleep(5)
         print("Last trader time: ", trader.get_last_trade_time())
         trader.get_subscribed_order_book_list()
         print("tick, trader.get_last_size(tick), trader.get_last_price(tick), trader.get_close_price(tick), trader.get_close_price(tick)")
