@@ -70,11 +70,12 @@ def start_trading(trader):
 
          for t in thread_list:
              t.join()
+ 
          if (time.time()-t0==30): #timer to execute during the stock market is open   
              break
     print("Waiting list orders :", trader.get_waiting_list())
     for order in trader.get_waiting_list():
-             trader.submit_cancellation(order)
+         trader.submit_cancellation(order)
     return  
 
 
