@@ -210,9 +210,16 @@ if __name__ == '__main__' :
         tickers = calculate_sd()
         market_calls(trader, tickers)
         end_time = dt.time(15,30,0)
+        timer =100
         while (end_time != trader.get_last_trade_time().time()):
-            start_trading(trader,tickers) #buy next 10 on limit
+            if timer ==0:
+                tickers = calculate_sd()
+                start_trading(trader,tickers)
+                timer =100
             sell_with_profit(trader) # sell with profits 
+            timer = timer-10
+            collect_data_incsv(trader, 10)
+            sleep(10)
     check_pending_orders(trader) 
     sell_all_shares(trader)
     show_orderbook(trader)
