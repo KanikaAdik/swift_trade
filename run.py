@@ -103,7 +103,7 @@ def start_trading(trader, tickers_list):
 
     #track for next 1 hr if profit in profile is higher then exit
 def check_pending_orders(trader):
-    timer = 10#0
+    timer = 100
     order_executed = False
     while timer:
         for order in trader.get_submitted_orders():
@@ -206,7 +206,7 @@ if __name__ == '__main__' :
     
     if market_is_open(trader): #or set a timer to exit from all positions
         print("Start Trading!")
-        #collect_data_incsv(trader, 600) # for initial purchases get data for next 10 min
+        collect_data_incsv(trader, 600) # for initial purchases get data for next 10 min
         tickers = calculate_sd()
         market_calls(trader, tickers)
         end_time = dt.time(15,30,0)
