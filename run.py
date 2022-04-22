@@ -154,7 +154,7 @@ def sell_with_profit(trader, tickers):
             lots = item.get_shares()
             lots = int(lots/100)
             order_stock(trader, item.get_symbol(), 'mrkt_sell', lots, 10)
-        if item.get_price()> tickers[stock_name][2]:
+        if item.get_price()> tickers[item.get_symbol()][2]:
             print("Exit in profit price higher in 52 weeks- ", item.get_symbol(),trader.get_unrealized_pl(item.get_symbol()))
             lots = item.get_shares()
             lots = int(lots/100)
@@ -247,7 +247,7 @@ if __name__ == '__main__' :
         with open(filename, 'w') as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(fields) 
-        collect_data_incsv(trader, 10) # for initial purchases get data for next 10 min
+        collect_data_incsv(trader,300) # for initial purchases get data for next 10 min
         tickers = calculate_sd() 
         market_calls(trader, tickers)
         timer =100
