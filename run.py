@@ -10,7 +10,6 @@ filename = "shift.csv"
 fields = ['Stock', 'Price', 'Time']
 start_time = dt.time(9,30,0)
 end_time = dt.time(15,45,0)
-
 def connect(username, password):
     print("Connecting..", username, password)
     trader = shift.Trader(username)
@@ -36,6 +35,12 @@ def market_is_open(trader):
 def get_price(trader, stock):
     bp= trader.get_best_price(stock)
     return bp.get_bid_price(), bp.get_ask_price()
+
+def get_current_price(trader, stock):
+    for item in trader.get_portfolio_items().values():
+        if stock == item.get_symbol():
+            price = item.get_price()
+    return price
 
 def print_orderbook(trader):
     print(" Price\t\tSize\t  Dest\t\tTime")
@@ -128,7 +133,10 @@ def start_trading(trader, tickers_list):
             lot = 1
         else: 
             lot = round(no_of_shares/100)
-        order_stock(trader, stock, 'limit_buy',lot,  values[1])
+        if get_current_price(trader, stock) < values[3]:
+            order_stock(trader, stock, 'mrkt_buy',lot,  values[1])
+        else:
+            order_stock(trader, stock, 'limit_buy',lot,  values[1])
             
 
     #track for next 1 hr if profit in profile is higher then exit
@@ -154,7 +162,7 @@ def sell_with_profit(trader, tickers):
             lots = item.get_shares()
             lots = int(lots/100)
             order_stock(trader, item.get_symbol(), 'mrkt_sell', lots, 10)
-        if item.get_price()> tickers[item.get_symbol()][2]:
+        if item.get_price()> tickers[item.get_symbol()][3]:
             print("Exit in profit price higher in 52 weeks- ", item.get_symbol(),trader.get_unrealized_pl(item.get_symbol()))
             lots = item.get_shares()
             lots = int(lots/100)
@@ -251,6 +259,7 @@ if __name__ == '__main__' :
         tickers = calculate_sd() 
         market_calls(trader, tickers)
         timer =100
+        cancel_order_timer =1200
         while (end_time > trader.get_last_trade_time().time()):
             print(end_time,trader.get_last_trade_time().time())
             if timer ==0:
@@ -261,6 +270,10 @@ if __name__ == '__main__' :
             timer = timer-10
             collect_data_incsv(trader, 10)
             sleep(10)
+            cancel_order_timer -= 1
+            if cancel_order_timer ==0:
+                cancel_pending_orders(trader)
+                cancel_order_timer=1200
     else:
         trader.disconnect()
         exit()
