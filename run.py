@@ -1,4 +1,4 @@
-import shift, time, csv
+import shift, time, csv, math
 from time import sleep
 import datetime as dt
 from threading import Thread
@@ -8,7 +8,9 @@ from numpy import std, mean
 STOCK_LIST =['AAPL', 'AXP', 'BA', 'CAT', 'CSCO', 'CVX', 'DIA', 'DIS', 'GS', 'HD', 'IBM', 'INTC', 'JNJ', 'JPM', 'KO', 'MCD', 'MMM', 'MRK', 'MSFT', 'NKE', 'PFE', 'PG', 'SPY', 'TRV', 'UNH', 'V', 'VZ', 'WBA', 'WMT', 'XOM']
 filename = "shift.csv"
 fields = ['Stock', 'Price', 'Time']
-
+start_time = dt.time(9,30,0)
+end_time = dt.time(14,50,0)
+executed =[]
 def connect(username, password):
     print("Connecting..", username, password)
     trader = shift.Trader(username)
@@ -22,8 +24,6 @@ def connect(username, password):
 def market_is_open(trader):
     print (trader.get_last_trade_time())
     #Original start & end time need to set before code release 
-    start_time = dt.time(9,30,0)
-    end_time = dt.time(15,30,0)
     while start_time > trader.get_last_trade_time().time():
         print("Market not yet open at ", trader.get_last_trade_time().time())
         sleep(10) #recheck after 10 seconds
@@ -44,6 +44,10 @@ def print_orderbook(trader):
         % (order.price, order.size, order.destination, order.time))
     return
 
+def cancel_pending_orders(trader):
+    print("Cancelling pending orders")
+    trader.cancel_all_pending_orders()
+
 def sell_all_shares(trader):
     print("Cancelling pending orders")
     trader.cancel_all_pending_orders()
@@ -57,10 +61,10 @@ def sell_all_shares(trader):
     sleep(10)
     return
 
-def collect_data_incsv(trader, end_time):
+def collect_data_incsv(trader, time_to_collect):
     csventry=[]
-    print("Checking -- ", trader.get_last_trade_time().time(), end_time)
-    while end_time:
+    print("Checking -- ", trader.get_last_trade_time().time(), time_to_collect)
+    while time_to_collect: #collecting data for last 30 seconds
         for stock in STOCK_LIST:
             price = trader.get_last_price(stock)
             if price ==0:
@@ -68,30 +72,57 @@ def collect_data_incsv(trader, end_time):
             time = trader.get_last_trade_time().time()
             entry=[stock, price, time]
             csventry.append(entry)
-        with open(filename, 'w') as csvfile:
-            csvwriter = csv.writer(csvfile)
-            csvwriter.writerow(fields)
-            csvwriter.writerows(csventry)
-        end_time -= 1
+        time_to_collect -= 1
         sleep(3)
+    with open(filename, 'a') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        #csvwriter.writerow(fields)
+        csvwriter.writerows(csventry)
     return
 
-def market_calls(trader, tickers):
-    print("Placing market calls")
-    for stock, values in tickers[:10]:
+def market_calls_buysell(trader, tickers):
+    print("Placing Market Buy Calls for first 10 tickers")
+    count =0
+    for stock, values in tickers.items():
+        print ("Stock & its values ::: ", stock, values)
         balance = (trader.get_portfolio_summary().get_total_bp() * 0.1)
         no_of_shares = round(balance/ values[1])
         if no_of_shares< 10 or no_of_shares<100 :
             lot = 1
-        else: 
+        else:
             lot = round(no_of_shares/100)
-        order_stock(trader, stock, 'mrkt_buy',lot,  values[1])
+        for item in trader.get_portfolio_items().values():
+            if item.get_price() - values[1] <1:
+                order_stock(trader, stock, 'mrkt_sell',lot, values[1])
+            else:
+                order_stock(trader, stock, 'mrkt_buy',lot, values[1])
+        count += 1
+        if count ==10:
+            break
+    return
+
+
+def market_calls(trader, tickers):
+    print("Placing Market Buy Calls for first 10 tickers")
+    count =0
+    for stock, values in tickers.items():
+        print ("Stock & its values ::: ", stock, values)
+        balance = (trader.get_portfolio_summary().get_total_bp() * 0.1)
+        no_of_shares = round(balance/ values[1])
+        if no_of_shares< 10 or no_of_shares<100 :
+            lot = 1
+        else:
+            lot = round(no_of_shares/100)
+        print("Check if good to by or good to sell by simple moving avg")
+        order_stock(trader, stock, 'mrkt_buy',lot, values[1])
+        count += 1
+        if count ==10:
+            break
     return
 
 def start_trading(trader, tickers_list):
-    for stock, values in tickers_list[11:20]:
-        #place limit orders on first 15 in the list
-        #buying_power 10%
+    for stock, values in tickers_list.items():
+        #place limit orders on all the stocks in the list, buying_power 10%
         balance = (trader.get_portfolio_summary().get_total_bp() * 0.1)
         no_of_shares = round(balance/ values[1])
         if no_of_shares< 10 or no_of_shares<100 :
@@ -116,32 +147,35 @@ def check_pending_orders(trader):
         sleep(10)
         timer -= 10
 
-def sell_with_profit(trader):
+def sell_with_profit(trader, tickers):
     for item in trader.get_portfolio_items().values():
-        if trader.get_unrealized_pl(item.get_symbol())>1000:
-            print("Exit in profit - ", item.get_symbol())
+        stock_name= item.get_symbol()
+        unrealized_pl = trader.get_unrealized_pl(stock_name) 
+        stock_high = math.ceil(tickers[stock_name][2])
+        lots = item.get_shares()
+        lots = int(lots/100)
+        if unrealized_pl>300 or item.get_price()> stock_high  : #set profit limit as per the item max earnings
+            print("Exit in profit - ", stock_name, unrealized_pl)
             order_stock(trader, item.get_symbol(), 'mrkt_sell', lots, 10)
-        if trader.get_unrealized_pl(item.get_symbol())<-300:
-            print("Exiting in loss at market price - ", item.get_symbol())
-            lots = item.get_shares()
-            lots = int(lots/100)
+        if trader.get_unrealized_pl(item.get_symbol())<-50:
+            print("Exiting in loss at market price - ", item.get_symbol(), trader.get_unrealized_pl(item.get_symbol()))
             order_stock(trader, item.get_symbol(), 'mrkt_sell' , lots, price=5)
 
-def calculate_sd():
+def calculate_sd(): # calculate standard deviation
     stocks_prices = defaultdict(list)
     std_dev = {}
     with open(filename, 'r') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             stocks_prices[row['Stock']].append(float(row['Price']))
-        for stock, salaries in stocks_prices.items():
-            std_dev[stock] = [std(salaries), min(salaries), max(salaries), mean(salaries)]
-        std_dev = sorted(std_dev.items(), key=lambda item: item[1],reverse=True)
+        for stock, prices in stocks_prices.items():
+            std_dev[stock] = [std(prices), min(prices), max(prices), mean(prices)]
+        std_dev = dict(sorted(std_dev.items(), key=lambda item: item[1],reverse=True))
     return std_dev
             
 
 def order_stock(trader, stock, _ordertype, no_lot=10, price=5):
-    print("Buying - ", stock, _ordertype,no_lot, price )
+    print("Order Call details - ", stock, _ordertype,no_lot, price )
     if _ordertype =='limit_buy':
         order = shift.Order(shift.Order.Type.LIMIT_BUY, stock, no_lot, price)
     if _ordertype =='limit_sell':
@@ -153,7 +187,7 @@ def order_stock(trader, stock, _ordertype, no_lot=10, price=5):
     trader.submit_order(order)
 
 
-def show_my_summary(trader):
+def show_summary(trader):
     print("Buying Power\tTotal Shares\tTotal P&L\tTimestamp")
     print(
     "%12.2f\t%12d\t%9.2f\t%26s"
@@ -163,7 +197,7 @@ def show_my_summary(trader):
         trader.get_portfolio_summary().get_total_realized_pl(),
         trader.get_portfolio_summary().get_timestamp(),
     ))
-    print("Symbol\t\tShares\t\tPrice\t\tP&L\t\tTimestamp")
+    print("Symbol\t\tShares\t\tPrice\t\tP&L\t\tTimestamp") 
     for item in trader.get_portfolio_items().values():
         print(
         "%6s\t\t%6d\t%9.2f\t%7.2f\t\t%26s"
@@ -182,6 +216,7 @@ def show_orderbook(trader):
     for order in trader.get_submitted_orders():
         if order.status == shift.Order.Status.FILLED :
             price = order.executed_price
+            #executed.append([order.symbol,order.type,order.executed_size,order.status, order.timestamp])
         else:
              price = order.price
         print(
@@ -201,27 +236,34 @@ if __name__ == '__main__' :
     print("Connecting...")
     trader = connect('swift_trade', 'crT4Y3w9')  
     sleep(5) #wait until connection is successful
-
     trader.sub_all_order_book()
     
     if market_is_open(trader): #or set a timer to exit from all positions
         print("Start Trading!")
-        collect_data_incsv(trader, 600) # for initial purchases get data for next 10 min
-        tickers = calculate_sd()
+        with open(filename, 'w') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(fields) 
+        collect_data_incsv(trader, 10) # for initial purchases get data for next 10 min
+        tickers = calculate_sd() 
         market_calls(trader, tickers)
-        end_time = dt.time(15,30,0)
         timer =100
-        while (end_time != trader.get_last_trade_time().time()):
+        while (end_time > trader.get_last_trade_time().time()):
+            print(end_time,trader.get_last_trade_time().time())
             if timer ==0:
+                cancel_pending_orders(trader)
                 tickers = calculate_sd()
-                start_trading(trader,tickers)
+                start_trading(trader, tickers)
                 timer =100
-            sell_with_profit(trader) # sell with profits 
+            sell_with_profit(trader, tickers) # sell with profits 
             timer = timer-10
             collect_data_incsv(trader, 10)
             sleep(10)
+            print ("Executed orders-- ", executed)
+    else:
+        trader.disconnect()
+        exit()
     check_pending_orders(trader) 
     sell_all_shares(trader)
     show_orderbook(trader)
-    show_my_summary(trader)
+    show_summary(trader)
     trader.disconnect()
