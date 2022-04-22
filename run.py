@@ -9,8 +9,8 @@ STOCK_LIST =['AAPL', 'AXP', 'BA', 'CAT', 'CSCO', 'CVX', 'DIA', 'DIS', 'GS', 'HD'
 filename = "shift.csv"
 fields = ['Stock', 'Price', 'Time']
 start_time = dt.time(9,30,0)
-end_time = dt.time(14,50,0)
-executed =[]
+end_time = dt.time(15,45,0)
+
 def connect(username, password):
     print("Connecting..", username, password)
     trader = shift.Trader(username)
@@ -113,7 +113,6 @@ def market_calls(trader, tickers):
             lot = 1
         else:
             lot = round(no_of_shares/100)
-        print("Check if good to by or good to sell by simple moving avg")
         order_stock(trader, stock, 'mrkt_buy',lot, values[1])
         count += 1
         if count ==10:
@@ -149,16 +148,21 @@ def check_pending_orders(trader):
 
 def sell_with_profit(trader, tickers):
     for item in trader.get_portfolio_items().values():
-        stock_name= item.get_symbol()
-        unrealized_pl = trader.get_unrealized_pl(stock_name) 
-        stock_high = math.ceil(tickers[stock_name][2])
-        lots = item.get_shares()
-        lots = int(lots/100)
-        if unrealized_pl>300 or item.get_price()> stock_high  : #set profit limit as per the item max earnings
-            print("Exit in profit - ", stock_name, unrealized_pl)
+        print("Unrealized profit :: ",item.get_symbol(), trader.get_unrealized_pl(item.get_symbol()) )
+        if trader.get_unrealized_pl(item.get_symbol())>300:
+            print("Exit in profit - ", item.get_symbol(),trader.get_unrealized_pl(item.get_symbol()))
+            lots = item.get_shares()
+            lots = int(lots/100)
+            order_stock(trader, item.get_symbol(), 'mrkt_sell', lots, 10)
+        if item.get_price()> tickers[stock_name][2]:
+            print("Exit in profit price higher in 52 weeks- ", item.get_symbol(),trader.get_unrealized_pl(item.get_symbol()))
+            lots = item.get_shares()
+            lots = int(lots/100)
             order_stock(trader, item.get_symbol(), 'mrkt_sell', lots, 10)
         if trader.get_unrealized_pl(item.get_symbol())<-50:
             print("Exiting in loss at market price - ", item.get_symbol(), trader.get_unrealized_pl(item.get_symbol()))
+            lots = item.get_shares()
+            lots = int(lots/100)
             order_stock(trader, item.get_symbol(), 'mrkt_sell' , lots, price=5)
 
 def calculate_sd(): # calculate standard deviation
@@ -216,7 +220,7 @@ def show_orderbook(trader):
     for order in trader.get_submitted_orders():
         if order.status == shift.Order.Status.FILLED :
             price = order.executed_price
-            #executed.append([order.symbol,order.type,order.executed_size,order.status, order.timestamp])
+           
         else:
              price = order.price
         print(
@@ -250,7 +254,6 @@ if __name__ == '__main__' :
         while (end_time > trader.get_last_trade_time().time()):
             print(end_time,trader.get_last_trade_time().time())
             if timer ==0:
-                cancel_pending_orders(trader)
                 tickers = calculate_sd()
                 start_trading(trader, tickers)
                 timer =100
@@ -258,7 +261,6 @@ if __name__ == '__main__' :
             timer = timer-10
             collect_data_incsv(trader, 10)
             sleep(10)
-            print ("Executed orders-- ", executed)
     else:
         trader.disconnect()
         exit()
