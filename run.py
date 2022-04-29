@@ -208,7 +208,6 @@ def check_stock(trader, stock_symbol):
         df = stock_df.iloc[-1:]
         no_of_lots = calculate_no_of_lots(trader, stock_df['Last Price'].min())
         item = trader.get_portfolio_item(stock_symbol)
-        print("Printing signal values ", signal, prev_signal)
         if prev_signal == signal: # Signal is same as before hence NO ACTION 
             #Check if you are holding any stock if yes then sleep if no place a new order
             if item.get_shares() !=0 : # you are holding shares  check profit or loss
@@ -298,7 +297,7 @@ if __name__ == "__main__":
             t1.start()
 
             #Create Multiple Threads for each Stock to check
-            sleep(10)
+            sleep(450)
             thread_list = []
             for a_stock in trader.get_stock_list():
                 thread = threading.Thread(target=check_stock, args=(trader, a_stock, ))
