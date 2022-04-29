@@ -197,12 +197,34 @@ def check_stock(trader, stock_symbol):
         # if average of spread is lower i.e. within 0.05, we can place short moving average calls
         # Short moving calls meaning SMA of - 20 rolling values
         # Compared with Long EMA of - 200 rolling value
-        stock_df = calculate_sma(data_collected, 'Last Price', 5, 20)
-        stock_df = calculate_ema(stock_df, 'Last Price', 200)
-        # create a new column 'Signal' such that if faster moving average is greater than slower moving average 
-        # then set Signal as 1 else 0.
-        stock_df['Signal'] = 0.0  
-        stock_df['Signal'] = np.where(stock_df['SMA20'] > stock_df['EMA200'], 1.0, 0.0) 
+        if (data_collected['Spread'].mean() <= 0.02):
+            stock_df = calculate_sma(data_collected, 'Last Price', 2, 5)
+            stock_df = calculate_ema(stock_df, 'Last Price', 10)
+            # create a new column 'Signal' such that if faster moving average is greater than slower moving average 
+            # then set Signal as 1 else 0.
+            stock_df['Signal'] = 0.0  
+            stock_df['Signal'] = np.where(stock_df['SMA5'] > stock_df['EMA10'], 1.0, 0.0)
+        elif (0.02< data_collected['Spread'].mean() <= 0.05):
+            stock_df = calculate_sma(data_collected, 'Last Price', 5, 10)
+            stock_df = calculate_ema(stock_df, 'Last Price', 20)
+            # create a new column 'Signal' such that if faster moving average is greater than slower moving average 
+            # then set Signal as 1 else 0.
+            stock_df['Signal'] = 0.0  
+            stock_df['Signal'] = np.where(stock_df['SMA10'] > stock_df['EMA20'], 1.0, 0.0)
+        elif (0.05<data_collected['Spread'].mean()<=0.1 ):
+            stock_df = calculate_sma(data_collected, 'Last Price', 5, 20)
+            stock_df = calculate_ema(stock_df, 'Last Price', 50)
+            # create a new column 'Signal' such that if faster moving average is greater than slower moving average 
+            # then set Signal as 1 else 0.
+            stock_df['Signal'] = 0.0  
+            stock_df['Signal'] = np.where(stock_df['SMA20'] > stock_df['EMA50'], 1.0, 0.0)
+        elif (0.1<data_collected['Spread'].mean()<=0.5):
+            stock_df = calculate_sma(data_collected, 'Last Price', 5, 20)
+            stock_df = calculate_ema(stock_df, 'Last Price', 100)
+            # create a new column 'Signal' such that if faster moving average is greater than slower moving average
+            # then set Signal as 1 else 0.
+            stock_df['Signal'] = 0.0  
+            stock_df['Signal'] = np.where(stock_df['SMA20'] > stock_df['EMA100'], 1.0, 0.0)
         prev_signal = signal
         signal = stock_df.iloc[-1:]['Signal'].values[0]
         df = stock_df.iloc[-1:]
@@ -212,6 +234,7 @@ def check_stock(trader, stock_symbol):
             #Check if you are holding any stock if yes then sleep if no place a new order
             if item.get_shares() !=0 : # you are holding shares  check profit or loss
                 print ("You are holding {} stocks of {} with current rate of {} and P/L as - {}".format(item.get_shares(), stock_symbol, item.get_price(), trader.get_unrealized_pl(stock_symbol)))
+
                 sleep(5)
                 continue
             elif item.get_shares() == 0:
@@ -223,7 +246,7 @@ def check_stock(trader, stock_symbol):
                     order_stock(trader, stock_symbol, 'mrkt_sell' , no_of_lots)
         elif prev_signal != signal: #Signal  has changed need to take action
             no_of_lots = int(item.get_shares()/100)
-            if signal == 1:
+            if signal == 0:
                 #check if already holding if yes - sell those shares if not BUY
                 if no_of_lots !=0: # you are holding shares SELL or BUY them to release
                     if no_of_lots < 0:
@@ -232,7 +255,7 @@ def check_stock(trader, stock_symbol):
                         order_stock(trader, stock_symbol, 'mrkt_sell' , no_of_lots, 10)
                 else: #you do not hold any shares for this stock you can place a new order based on signal
                     order_stock(trader, stock_symbol, 'limit_buy' , no_of_lots, price=df["Last Price"])
-            elif signal ==0:
+            elif signal == 1:
                 if no_of_lots !=0: # you are holding shares SELL or BUY them to release
                     if no_of_lots < 0:
                         order_stock(trader, stock_symbol, 'mrkt_buy' , abs(no_of_lots), 10)
@@ -240,7 +263,6 @@ def check_stock(trader, stock_symbol):
                         order_stock(trader, stock_symbol, 'mrkt_sell' , no_of_lots, 10)
                 else: #you do not hold any shares for this stock you can place a new order based on signal
                     order_stock(trader, stock_symbol, 'limit_sell' , no_of_lots, price=df["Last Price"])
-
         sleep(1)
         
 def show_orderbook(trader):
