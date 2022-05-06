@@ -235,7 +235,7 @@ def check_stock(trader, stock_symbol):
                 #place more Sell limit orders on top of existing share holdings
                 ten_percent_price = item.get_price() - item.get_price()*0.04
                 print("Checking losses ", ten_percent_price,trader.get_last_price(stock_symbol) )
-                if ten_percent_price > trader.get_last_price(stock_symbol) or  trader.get_unrealized_pl(stock_symbol)<-300: #losses are higher than 8% then exit
+                if (trader.get_last_price(stock_symbol)-ten_percent_price>2)  or  trader.get_unrealized_pl(stock_symbol)<-300: #losses are higher than 8% then exit
                     no_of_lots = int(item.get_shares()/100)
                     order_stock(trader, stock_symbol, 'mrkt_sell' , no_of_lots, 0)
                     continue
@@ -304,7 +304,7 @@ if __name__ == "__main__":
         trader = connect('swift_trade', 'crT4Y3w9')  
         sleep(5) #wait until connection is successful for further executions
         trader.sub_all_order_book()
-        
+        sell_all_shares(trader)
         #if market is open start data collection and trading individual stocks
         if market_is_open(trader): 
             print("Start Trading!")
