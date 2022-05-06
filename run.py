@@ -236,7 +236,7 @@ def check_stock(trader, stock_symbol):
                 ten_percent_price = item.get_price() - item.get_price()*0.04
                 print("Checking losses ", ten_percent_price,trader.get_last_price(stock_symbol) )
                 if ten_percent_price > trader.get_last_price(stock_symbol) or  trader.get_unrealized_pl(stock_symbol)<-300: #losses are higher than 8% then exit
-                    no_of_lots = item.get_shares()/100
+                    no_of_lots = int(item.get_shares()/100)
                     order_stock(trader, stock_symbol, 'mrkt_sell' , no_of_lots, 0)
                     continue
                 if item.get_shares()>0: #positive i.e. you had BUY you need to sell
