@@ -214,7 +214,7 @@ def check_stock(trader, stock_symbol):
                 if item.get_shares()>0:#BUY SECTION profits
                     no_of_lots = int(item.get_shares()/100)
                     highest_spread_price =  item.get_price() + data_collected['Spread'].max()
-                    if  trader.get_last_price(stock_symbol) > highest_spread_price : #10 percent profits made exit
+                    if  trader.get_last_price(stock_symbol) > highest_spread_price  or trader.get_unrealized_pl(stock_symbol)>2000: #10 percent profits made exit
                         print("Profits are 10% above exiting")
                         order_stock(trader, stock_symbol, 'mrkt_sell' , no_of_lots, price)
                         continue
@@ -224,17 +224,18 @@ def check_stock(trader, stock_symbol):
                 elif item.get_shares()<0:
                     no_of_lots = int(item.get_shares()/100)
                     lowest_spread_price =  item.get_price() - data_collected['Spread'].max()
-                    if  trader.get_last_price(stock_symbol) < lowest_spread_price : #10 percent profits made exit
+                    price = data_collected['Bid Price'].max()
+                    if  trader.get_last_price(stock_symbol) < lowest_spread_price  or trader.get_unrealized_pl(stock_symbol)>2000: #10 percent profits made exit
                         print("Profits are 10% above exiting")
                         order_stock(trader, stock_symbol, 'mrkt_buy' , no_of_lots, price)
                         continue
                     no_of_lots = int(round(0.5 * (item.get_shares()/100)))
-                    price = data_collected['Bid Price'].max()
                     order_stock(trader, stock_symbol, 'limit_sell' , no_of_lots, price)
             elif trader.get_unrealized_pl(stock_symbol)<0: # we are in loss
                 #place more Sell limit orders on top of existing share holdings
                 ten_percent_price = item.get_price() - item.get_price()*0.08
-                if ten_percent_price > trader.get_last_price(stock_symbol): #losses are higher than 8% then exit
+                print("Checking losses ", ten_percent_price,trader.get_last_price(stock_symbol) )
+                if ten_percent_price > trader.get_last_price(stock_symbol) or  trader.get_last_price(stock_symbol)<-500: #losses are higher than 8% then exit
                     order_stock(trader, stock_symbol, 'mrkt_sell' , no_of_lots, price)
                     continue
                 if item.get_shares()>0: #positive i.e. you had BUY you need to sell
