@@ -217,10 +217,10 @@ def place_orders():
                 print(long_position_calls_exceeded(portfolio, ticker))
                 if not long_position_calls_exceeded(portfolio, ticker):
                     print("longpositioncalls done")
-                    buy.append(set_quantity_price(-i, ticker))
+                    buy.append(set_quantity_price(-i, ticker), ticker)
                 if not short_position_calls_exceeded(portfolio, ticker):
                     print("shortpositioncalls done")
-                    sell.append(set_quantity_price(i, ticker))
+                    sell.append(set_quantity_price(i, ticker), ticker)
     return converge_orders(buy, sell)
 
 def get_price_offset(index, ticker, quantity):
@@ -233,6 +233,7 @@ def get_price_offset(index, ticker, quantity):
     print(ticker)
     filename = os.path.join(file_name,ticker)
     data_collected = pd.read_csv(filename)
+    data_collected.dropna(inplace=True)
     current_spread = round(data_collected['Spread'].mean(),2)  
     start_position_buy = data_collected['Bid Price'].min()  + current_spread
     start_position_sell = data_collected['Ask Price'].max() - current_spread
@@ -270,6 +271,9 @@ def converge_orders(buy_order, sell_order):
         except IndexError:             # Will throw if there isn't a desired order to match. In that case, cancel it.
             to_cancel.append(order)
     while buysmatched < len(buy_order):
+        print (buy_order[buysmatched])
+        buy_order[buysmatched].update({"type":"buy"})
+        print(buy_order[buysmatched])
         to_create.append(buy_order[buysmatched])
         buysmatched += 1
     while sellsmatched < len(sell_order):
@@ -277,7 +281,6 @@ def converge_orders(buy_order, sell_order):
         sellsmatched += 1 
     if len(to_amend) > 0:
         for order in to_amend:
-            print ("ammedn : ", order )
             if trader.get_order(order['id']).status== 'Status.FILLED':
                 continue
             if  order['type'] in ["Type.LIMIT_BUY", "Type.MARKET_BUY"]:
@@ -288,6 +291,7 @@ def converge_orders(buy_order, sell_order):
             trader.submit_order(place_order)
     if len(to_create) > 0:
         for orders in reversed(to_create):
+            print(orders)
             if  orders['type'] in ["Type.LIMIT_BUY", "Type.MARKET_BUY"]:
                 place_order = shift.Order(shift.Order.Type.LIMIT_BUY, orders['stock'], orders['orderQty'], orders['price'])
             if  orders['type'] in ["Type.LIMIT_SELL", "Type.MARKET_SELL"]:
