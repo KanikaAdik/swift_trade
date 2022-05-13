@@ -74,16 +74,15 @@ def market_is_open():
     if  trader.get_last_trade_time().time()>END_TIME:
         print ("Market is Closed. Current time - ", trader.get_last_trade_time().time())
         return False 
-    return True
     #Create a csv file to collect data 
-    #os.mkdir(PATH)
-    #print("Directory created successfully -", PATH)
-    #for stock_symbol in trader.get_stock_list():
-    #    with open(os.path.join(PATH,stock_symbol+".csv"),  'w') as csvfile:
-    #        csvwriter = csv.writer(csvfile)
-    #        csvwriter.writerow(['Last Price', 'Bid Price','Ask Price', 'Bid Volume','Ask Volume', 'Spread', 'Time']) 
-    #print ("CSV Files created successfully")
-    #return True 
+    os.mkdir(PATH)
+    print("Directory created successfully -", PATH)
+    for stock_symbol in trader.get_stock_list():
+        with open(os.path.join(PATH,stock_symbol+".csv"),  'w') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(['Last Price', 'Bid Price','Ask Price', 'Bid Volume','Ask Volume', 'Spread', 'Time']) 
+    print ("CSV Files created successfully")
+    return True 
 
 def get_price(stock):
     """
