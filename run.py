@@ -79,7 +79,7 @@ def market_is_open():
     os.mkdir(PATH)
     print("Directory created successfully -", PATH)
     for stock_symbol in trader.get_stock_list():
-        with open(os.path.join(PATH,stock_symbol),  'w') as csvfile:
+        with open(os.path.join(PATH,stock_symbol,".csv"),  'w') as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(['Last Price', 'Bid Price','Ask Price', 'Bid Volume','Ask Volume', 'Spread', 'Time']) 
     print ("CSV Files created successfully")
@@ -230,7 +230,7 @@ def get_price_offset(index, ticker, quantity):
     #get LOWEST of SELL price 
     #having SPREAD already, get MIN SPREAD to calculate start position to buy & sell 
     #set in a dictionary and resend back with buy or sell call
-    filename = os.path.join(file_name,ticker)
+    filename = os.path.join(file_name,ticker+".csv")
     data_collected = pd.read_csv(filename)
     data_collected.dropna(inplace=True)
     current_spread = round(data_collected['Spread'].mean(),2)  
