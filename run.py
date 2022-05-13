@@ -1,4 +1,7 @@
+
 from hashlib import new
+from pickle import TRUE
+from pydoc import describe
 from tkinter import SEL_LAST
 import shift 
 import threading, csv, os
@@ -6,14 +9,38 @@ import datetime as dt
 from time import sleep
 import pandas as pd
 import numpy as np
+import math
 
+trader=None
+file_name = os.path.join(os.getcwd(), "CSVFILES")
 START_TIME = dt.time(9,30,0)
 END_TIME = dt.time(15,45,0)
 PATH= os.path.join(os.getcwd(), "CSVFILES")
 
+#ORDER STATIC DATA
+LOOP_INTERVAL = 5
+ORDER_PAIR=6
+ORDER_START_SIZE = 100
+ORDER_STEP_SIZE = 100
+
+API_REST_INTERVAL=2 
+
+INTERVAL =0.005
+
+TIMEOUT=7
+
+CHECK_POSITIONLIMIT=True
+MIN_POSITION = -1000
+MAX_POSITION = 1000
+
+#SINGLE STOCK MIN SPREAD And Condition
+MIN_SPREAD=0.01
+RELIST_INTERVAL=0.01 #1%
+
+
 def connect(username, password):
     """
-    Function to - Connect to Stock exchage with username and password creds and initiator.cfg configuration
+    Function to - Connect to Stock exchage with username and password 
     - uses shift library to connect
     - if connection not successful check the Exceptions 
     - code will exit on exception
@@ -22,12 +49,12 @@ def connect(username, password):
     trader = shift.Trader(username)
     try:
         trader.connect("initiator.cfg", password)
-        return trader
+        return trader 
     except Exception as e:
         print("Exception occurred : ", e)
         exit()
 
-def market_is_open(trader):
+def market_is_open():
     """
     Function to - 
     Checking if Market is open,
@@ -47,38 +74,18 @@ def market_is_open(trader):
     if  trader.get_last_trade_time().time()>END_TIME:
         print ("Market is Closed. Current time - ", trader.get_last_trade_time().time())
         return False 
+    return True
     #Create a csv file to collect data 
-    os.mkdir(PATH)
-    print("Directory created successfully -", PATH)
-    for stock_symbol in trader.get_stock_list():
-        with open(os.path.join(PATH,stock_symbol+".csv"),  'w') as csvfile:
-            csvwriter = csv.writer(csvfile)
-            csvwriter.writerow(['Last Price', 'Bid Price','Ask Price', 'Bid Volume','Ask Volume', 'Spread', 'Time']) 
-    print ("CSV Files created successfully")
-    return True 
+    #os.mkdir(PATH)
+    #print("Directory created successfully -", PATH)
+    #for stock_symbol in trader.get_stock_list():
+    #    with open(os.path.join(PATH,stock_symbol+".csv"),  'w') as csvfile:
+    #        csvwriter = csv.writer(csvfile)
+    #        csvwriter.writerow(['Last Price', 'Bid Price','Ask Price', 'Bid Volume','Ask Volume', 'Spread', 'Time']) 
+    #print ("CSV Files created successfully")
+    #return True 
 
-def sell_all_shares(trader):
-    print("Cancelling pending orders")
-    trader.cancel_all_pending_orders()
-    print("Selling all shares")
-    for item in trader.get_portfolio_items().values():
-        lots = item.get_shares()
-        if lots!=0:
-            lots= int(lots/100)
-            order_stock(trader, item.get_symbol(), 'mrkt_sell', lots, 10)
-            print ("sold shares --- ", item.get_symbol(),item.get_shares())
-    sleep(10)
-    return
-
-def get_price(trader, stock):
-    """
-    Fucntion to - Get the best price of a stock
-    returns Ask price, Bid Price , Ask Size & Bid size 
-    """
-    bp= trader.get_best_price(stock)
-    return bp.get_bid_price(), bp.get_bid_size(), bp.get_ask_price(), bp.get_ask_size()
-
-def collect_data(trader):
+def collect_data():
     """
     Function to - Collect data on a timely basis until end time occurs
         Will keep on adding data till the end of market closure i.e. 4 pm
@@ -89,7 +96,7 @@ def collect_data(trader):
         #print("DB collection dozzing off 10 sec...Zzzzz!!!")
         sleep(1) #wait for next 5 sec to update prices in respective csv files
         for stock_symbol in trader.get_stock_list():
-            prices = get_price(trader, stock_symbol)
+            prices = get_price(stock_symbol)
             time = trader.get_last_trade_time().time()
             last_price = trader.get_last_price(stock_symbol)
             entry=[last_price, prices[0], prices[2], prices[1], prices[3], prices[2]-prices[0], time]
@@ -97,206 +104,178 @@ def collect_data(trader):
             with open(file, 'a') as csvfile:
                 csvwriter = csv.writer(csvfile)
                 csvwriter.writerow(entry)
-     
-def checkif_order_placed(trader, stock_symbol, new_size, new_price, new_type):
-    for order in trader.get_submitted_orders():
-        if order.symbol == stock_symbol:
-            if order.status in [shift.Order.Status.PENDING_NEW, shift.Order.Status.NEW,shift.Order.Status.PARTIALLY_FILLED]:
-                print("comparinf --", order.size,new_size,order.price,new_price, order.type, new_type )
-                if order.size == new_size and order.price == new_price and str(order.type)== str(new_type):
-                    print("order exists")
-                    return True
-    return False
 
-def order_stock(trader, stock, _ordertype, no_lot=10, price=10):
-    if _ordertype =='limit_buy':
-        if  checkif_order_placed(trader, stock, no_lot, price, "Type.LIMIT_BUY"):
-            return 
-        order = shift.Order(shift.Order.Type.LIMIT_BUY, stock, no_lot, price)
-    if _ordertype =='limit_sell':
-        if  checkif_order_placed(trader, stock, no_lot, price, "Type.LIMIT_SELL"):
-            return 
-        order = shift.Order(shift.Order.Type.LIMIT_SELL, stock, no_lot, price)
-    if _ordertype == 'mrkt_buy':
-        if  checkif_order_placed(trader, stock, no_lot, price, "Type.MARKET_BUY"):
-            return 
-        order = shift.Order(shift.Order.Type.MARKET_BUY, stock, no_lot, price)
-    if _ordertype == 'mrkt_sell':
-        if  checkif_order_placed(trader, stock, no_lot, price, "Type.MARKET_SELL"):
-            return 
-        order = shift.Order(shift.Order.Type.MARKET_SELL, stock, no_lot, price)
-    print("Placing Order Call details - ", stock, _ordertype, no_lot, price )
-    trader.submit_order(order)
-    
-def check_trend(data_collected):
-    spread = data_collected['Spread']
-    liquidity = round(spread.mean(),2)
-    if data_collected['Bid Volume'].sum()> data_collected['Ask Volume'].sum(): # market trend is BEARISH
-        trend = 'BEARISH'
-    elif data_collected['Bid Volume'].sum()< data_collected['Ask Volume'].sum(): # market trend is BULLISH
-        trend = 'BULLISH'
-    if liquidity < 0.1 and trend == 'BEARISH':
-        return 'SELL_ST'  #Place limit calls for SELL Long term  
-    if liquidity > 0.1 and trend == 'BEARISH':
-        return 'SELL_LT' #Place limit calls for SELL Short term 
-    if liquidity <= 0.1 and trend == 'BULLISH':
-        return 'BUY_ST'  #Place limit calls for BUY Long term  
-    if liquidity >= 0.1 and trend == 'BULLISH':
-        return 'BUY_LT' #Place limit calls for BUY Short term 
-    return 'NO_NE'
-
-def calculate_no_of_lots(balance, price):
-    no_of_shares = round(balance/price)
-    if no_of_shares< 10 or no_of_shares<100 :
-        no_of_lots = 1
-    else:
-        no_of_lots = round(no_of_shares/100)
-    return no_of_lots
-
-def show_summary(trader):
-    """
-    Function to -
-    Show current buying power of your account
-    Number of shares holding
-    Shares with waiting list
-    """
-    print("Buying Power\tTotal Shares\tTotal P&L\tTimestamp")
-    print( "%12.2f\t%12d\t%9.2f\t%26s"
-    % (
-        trader.get_portfolio_summary().get_total_bp(),
-        trader.get_portfolio_summary().get_total_shares(),
-        trader.get_portfolio_summary().get_total_realized_pl(),
-        trader.get_portfolio_summary().get_timestamp(),
-    ))
-    print("Symbol\t\tShares\t\tPrice\t\tP&L\t\tTimestamp") 
-    for item in trader.get_portfolio_items().values():
-        print(
-        "%6s\t\t%6d\t%9.2f\t%7.2f\t\t%26s"
-        % (
-            item.get_symbol(),
-            item.get_shares(),
-            item.get_price(),
-            item.get_realized_pl(),
-            item.get_timestamp()  
-        ))
-    print("Shares with Waiting List .. \nSymbol\t\t\t\tType\t  Price\t\tSize\tExecuted\tID\t\t\t\t\t\t\t\t\t\t\t\t\t\t Status\t\tTimestamp"
-)
+def get_waitinglistorders():
+    waiting_list={}
     for order in trader.get_waiting_list():
-        print(
-        "%6s\t%16s\t%7.2f\t\t%4d\t\t%4d\t%36s\t%23s\t\t%26s"
-        % (
-            order.symbol,
-            order.type,
-            order.price,
-            order.size,
-            order.executed_size,
-            order.id,
-            order.status,
-            order.timestamp,
-        )
-    )
+        waiting_list[order.symbol]= {'type': order.type, 
+                                    'price': order.price,
+                                    'size': order.size,
+                                    'executed':order.executed_size,
+                                    'status': order.status,
+                                    'id': order.id
+        }
+    return waiting_list
 
+def get_summary():
+    portfolio = {'buyingpower': trader.get_portfolio_summary().get_total_bp(),
+                  'pnl': trader.get_portfolio_summary().get_total_shares(),
+                  'ts': trader.get_portfolio_summary().get_timestamp(),
+                  'stocks':[]}
+    for item in trader.get_portfolio_items().values():
+        portfolio['stocks'].append(item.get_symbol())
+        portfolio[item.get_symbol()]={'noofshares': item.get_shares(), 
+                                      'buyprice':item.get_price(), 
+                                      'pnl': item.get_realized_pl()}
+    return portfolio
 
-def check_stock(trader, stock_symbol):
-    print("Keep on Checking stock in the check_stock:", stock_symbol)
-    file_name  = os.path.join(os.getcwd(),"CSVFILES", stock_symbol+".csv")
-    cleanup_timer =1800
-    freshstart = 4
-    while (END_TIME > trader.get_last_trade_time().time()):
-        data_collected = pd.read_csv(file_name)
-        trend = check_trend(data_collected)
-        print("TREND-", trend)
-        item = trader.get_portfolio_item(stock_symbol)
-        if item.get_shares() !=0 : # you are already holding
-            print ("You are holding {} stocks of {} with  buy rate {} current rate of {} and P/L as - {}".format(item.get_shares(), stock_symbol, item.get_price(),trader.get_last_price(stock_symbol), trader.get_unrealized_pl(stock_symbol)))
-            if trader.get_unrealized_pl(stock_symbol)>0: #we are making profits
-                #place more Buy limit orders on top of existing share holdings 
-                if item.get_shares()>0:#BUY SECTION profits
-                    no_of_lots = int(item.get_shares()/100)
-                    highest_spread_price =  item.get_price() + data_collected['Spread'].max()
-                    if  trader.get_last_price(stock_symbol) > highest_spread_price  or trader.get_unrealized_pl(stock_symbol)>2000: #10 percent profits made exit
-                        print("Profits are 10% above exiting")
-                        order_stock(trader, stock_symbol, 'mrkt_sell' , no_of_lots, price)
-                        continue
-                    no_of_lots = int(round(0.5 * (item.get_shares()/100)))
-                    price = data_collected['Ask Price'].min()
-                    order_stock(trader, stock_symbol, 'limit_buy' , no_of_lots, price)
-                elif item.get_shares()<0:
-                    no_of_lots = int(item.get_shares()/100)
-                    lowest_spread_price =  item.get_price() - data_collected['Spread'].max()
-                    price = data_collected['Bid Price'].max()
-                    if  trader.get_last_price(stock_symbol) < lowest_spread_price  or trader.get_unrealized_pl(stock_symbol)>1500: #10 percent profits made exit
-                        print("Profits are 10% above exiting")
-                        order_stock(trader, stock_symbol, 'mrkt_buy' , no_of_lots, price)
-                        continue
-                    no_of_lots = int(round(0.5 * (item.get_shares()/100)))
-                    order_stock(trader, stock_symbol, 'limit_sell' , no_of_lots, price)
-            elif trader.get_unrealized_pl(stock_symbol)<0: # we are in loss
-                #place more Sell limit orders on top of existing share holdings
-                ten_percent_price = item.get_price() - item.get_price()*0.04
-                print("Checking losses ", ten_percent_price,trader.get_last_price(stock_symbol) )
-                if (trader.get_last_price(stock_symbol)-ten_percent_price>2)  or  trader.get_unrealized_pl(stock_symbol)<-300: #losses are higher than 8% then exit
-                    no_of_lots = int(item.get_shares()/100)
-                    order_stock(trader, stock_symbol, 'mrkt_sell' , no_of_lots, 0)
-                    continue
-                if item.get_shares()>0: #positive i.e. you had BUY you need to sell
-                    no_of_lots = int(round(0.5 * (item.get_shares()/100)))
-                    price = data_collected['Bid Price'].max()
-                    order_stock(trader, stock_symbol, 'limit_sell' , no_of_lots, price)
-                elif item.get_shares()<0: #negative i.e. you had SELL
-                    no_of_lots = int(round(0.5 * (item.get_shares()/100)))
-                    price = data_collected['Ask Price'].max()
-                    order_stock(trader, stock_symbol, 'limit_buy' , no_of_lots, price)      
-        else: #placing new calls
-            trend = trend.split("_") #Check trend and place orders
-            buying_power = trader.get_portfolio_summary().get_total_bp()
+def get_orderbook():
+    holding={}
+    pending={}
+    rejected={}
+    for order in trader.get_submitted_orders():
+        if order.status == shift.Order.Status.FILLED :
+            holding[order.symbol] = {'type': order.status,'price': order.executed_price, 'size': order.size,
+                                    'executed_size': order.executed_size, 'id': order.id, 'status': order.status}
+        elif order.status == shift.Order.Status.REJECTED :
+            rejected[order.symbol] = {'type': order.status,'price': order.executed_price, 'size': order.size,
+                         'executed_size': order.executed_size, 'id': order.id, 'status': order.status}
+        else:
+            pending[order.symbol] = {'type': order.status,'price': order.executed_price, 'size': order.size,
+                         'executed_size': order.executed_size, 'id': order.id, 'status': order.status}
+    print("HOLDING: ", holding, "\n\nREJECTED:", rejected,"\n\n\nPENDING", pending)
 
-            price = trader.get_last_price(stock_symbol)
-            if trend[1] == "LT": #purchase for Long term , low liquidity rate
-                buying_power = buying_power*0.25
-                if trend[0] == "BUY": 
-                    no_of_lots = calculate_no_of_lots(buying_power, price)
-                    price = data_collected['Ask Price'].min()
-                    order_stock(trader, stock_symbol, 'limit_buy' , no_of_lots, price)
-                elif trend[0] == "SELL":
-                    no_of_lots = calculate_no_of_lots(buying_power, price)
-                    price = data_collected['Bid Price'].max()
-                    order_stock(trader, stock_symbol, 'limit_sell' , no_of_lots, price)
-            elif trend[1] == "ST": #purchase short term for quick orders
-                buying_power = buying_power*0.4
-                if trend[0] == "BUY": 
-                    no_of_lots = calculate_no_of_lots(buying_power, price)
-                    order_stock(trader, stock_symbol, 'mrkt_buy' , no_of_lots, price)
-                    price = price + (price * 0.05)
-                    order_stock(trader, stock_symbol, 'limit_sell' , no_of_lots, price)
-                elif trend[0] == "SELL":
-                    no_of_lots = calculate_no_of_lots(buying_power, trader.get_last_price(stock_symbol))
-                    order_stock(trader, stock_symbol, 'mrkt_sell' , no_of_lots, price)
-                    price = price - (price * 0.05)
-                    order_stock(trader, stock_symbol, 'limit_buy' , no_of_lots, price)
-            else:
-                print ("no trend")
-        #for all executed orders set selling price
-        for order in trader.get_submitted_orders():
-            if order.symbol == stock_symbol:
-                if order.status == shift.Order.Status.FILLED:
-                    if str(order.type) == str("Type.LIMIT_BUY"):
-                        price = order.executed_price + order.executed_price * 0.05
-                        order_stock(trader, order.symbol , 'limit_sell' , order.executed_size, price)
-                    elif str(order.type) == str("Type.LIMIT_SELL"):
-                        price = order.executed_price - order.executed_price * 0.05
-                        order_stock(trader, order.symbol , 'limit_buy' , order.executed_size, price)
-        sleep(1)
-        cleanup_timer = cleanup_timer -1
-        if cleanup_timer ==0:
-            show_summary(trader) 
-            trader.cancel_all_pending_orders()
-            cleanup_timer =1800 #cleanign up pending orders after half hr
-            freshstart = freshstart -1
-            if freshstart == 0:
-                sell_all_shares(trader)
-                freshstart=5
+def get_all_tickers():
+    all_ticker = []
+    for ticker in trader.get_stock_list():
+        bp= trader.get_best_price(ticker)
+        all_ticker[ticker] = {'bid_price':bp.get_bid_price(),
+                             'bid_size': bp.get_bid_size() ,
+                             'ask_price': bp.get_ask_price(),
+                             'ask_size':bp.get_ask_size()}
 
+def short_position_calls_exceeded(portfolio, ticker):
+    if not CHECK_POSITIONLIMIT:
+        return False
+    if not portfolio['stocks']:
+        return False
+    noofholding = portfolio[ticker]['noofshares'] #get_current holding if short limit is exceeded
+    print("i short prosiotn calls:", noofholding  )
+    return  noofholding < MIN_POSITION 
+
+def long_position_calls_exceeded(portfolio, ticker): # if long position limit is exceeded
+    if not CHECK_POSITIONLIMIT:
+        return False
+    if not portfolio['stocks']:
+        return False
+    noofholding = portfolio[ticker]['noofshares'] #get_current holdings
+    print("i short prosiotn calls:", noofholding  )
+    return  noofholding > MAX_POSITION 
+
+def check_sanity():
+    portfolio = get_summary()
+    for ticker in portfolio['stocks']:
+        if short_position_calls_exceeded(portfolio, ticker):
+            print("short position call limits exeeeced")
+        if long_position_calls_exceeded(portfolio, ticker):
+            print("long position call limits exeeeced")
+    #position limits are reached
+    #if current position get delta maximum position
+    order_book = get_orderbook()
+    waiting_orders = get_waitinglistorders()
+    if portfolio['pnl']<0:
+        print("Running in loss , need to take action")
+    else:
+        print("Running in profit")
+#in get ticker prices place the 
+
+def place_orders():
+    buy=[]
+    sell=[]
+    portfolio = get_summary()
+    print("in place order ", portfolio)
+    for ticker in trader.get_stock_list():
+            for i in reversed(range(1, ORDER_PAIR + 1)):
+                print("in place orders:", i)
+                print(long_position_calls_exceeded(portfolio, ticker))
+                if not long_position_calls_exceeded(portfolio, ticker):
+                    print("longpositioncalls done")
+                    buy.append(set_quantity_price(-i, ticker))
+                if not short_position_calls_exceeded(portfolio, ticker):
+                    print("shortpositioncalls done")
+                    sell.append(set_quantity_price(i, ticker))
+    return converge_orders(buy, sell)
+
+def get_price_offset(index, ticker):
+    #read the CSV's  for a single TICKER 
+    #calcualte mean of the SPREAD to calculate BUY& SELL
+    #Get HIGHEST of BUY Call
+    #get LOWEST of SELL price 
+    #having SPREAD already, get MIN SPREAD to calculate start position to buy & sell 
+    #set in a dictionary and resend back with buy or sell call
+    print(ticker)
+    filename = os.path.join(file_name,ticker)
+    data_collected = pd.read_csv(filename)
+    current_spread = round(data_collected['Spread'].mean,2)  
+    start_position_buy = data_collected['Bid Price'].min  + current_spread
+    start_position_sell = data_collected['Ask Price'].max - current_spread
+
+    start_position = start_position_buy if index < 0 else start_position_sell
+    # First positions (index 1, -1) should start right at start_position, others should branch from there
+    index = index + 1 if index < 0 else index - 1
+    return math.toNearest(start_position * (1 + INTERVAL) ** index)
+
+def set_quantity_price(index, ticker): #prepare order
+    quantity = ORDER_START_SIZE + ((abs(index) - 1) * ORDER_STEP_SIZE)
+    price = get_price_offset(index, ticker)
+    return {'price': price, 'orderQty': quantity, 'side': "Buy" if index < 0 else "Sell"}
+   
+def converge_orders(buy_order, sell_order):
+    existing_orders = get_waitinglistorders()
+    to_amend = []
+    to_create = []
+    to_cancel = []
+    buysmatched =0
+    sellsmatched =0
+    for order in existing_orders.items():
+        try:
+            if order[1]['type']== "Type.LIMIT_BUY" or order[1]['type']=="Type.MARKET_BUY" : 
+                desired_order = buy_order[buysmatched]
+                buysmatched  +=1
+            elif order[1]['type']== "Type.LIMIT_SELL" or order[1]['type']=="Type.MARKET_SELL" :
+                desired_order = sell_order[sellsmatched]
+                sellsmatched +=1
+            #if found existingorder
+            if desired_order['orderQty'] != order[1]['size'] or (
+                desired_order['price'] != order[1]['price'] and abs((desired_order['price'] / order[1]['price']) - 1) > RELIST_INTERVAL):
+                to_amend.append({'stock': order[0], 'orderID': order[1]['id'], 'orderQty': order['quantity'] + desired_order['orderQty'],
+                             'price': desired_order['price'], 'type': order[1]['type']})
+        except IndexError:             # Will throw if there isn't a desired order to match. In that case, cancel it.
+            to_cancel.append(order)
+    while buysmatched < len(buy_order):
+        to_create.append(buy_order[buysmatched])
+        buysmatched += 1
+    while sellsmatched < len(sell_order):
+        to_create.append(sell_order[sellsmatched])
+        sellsmatched += 1 
+    if len(to_amend) > 0:
+        for orders in to_amend:
+            if trader.get_order(order[1]['id']).status== 'Status.FILLED':
+                continue
+            if  order[1]['type'] in ["Type.LIMIT_BUY", "Type.MARKET_BUY"]:
+                place_order = shift.Order(shift.Order.Type.LIMIT_BUY, orders['stock'], orders['orderQty'], orders['price'])
+            if  order[1]['type'] in ["Type.LIMIT_SELL", "Type.MARKET_SELL"]:
+                place_order = shift.Order(shift.Order.Type.LIMIT_SELL, orders['stock'], orders['orderQty'], orders['price'])
+            print("Placing order Type.LIMIT_SELL", orders['stock'], orders['orderQty'], orders['price']  )
+            trader.submit_order(place_order)
+    if len(to_create) > 0:
+        for order in reversed(to_create):
+            if  order[1]['type'] in ["Type.LIMIT_BUY", "Type.MARKET_BUY"]:
+                place_order = shift.Order(shift.Order.Type.LIMIT_BUY, orders['stock'], orders['orderQty'], orders['price'])
+            if  order[1]['type'] in ["Type.LIMIT_SELL", "Type.MARKET_SELL"]:
+                place_order = shift.Order(shift.Order.Type.LIMIT_SELL, orders['stock'], orders['orderQty'], orders['price'])
+            print("Placing order Type.LIMIT_SELL", orders['stock'], orders['orderQty'], orders['price']  )
+            trader.submit_order(place_order)
 
 if __name__ == "__main__":
     #Connect to the Stock Exchange
@@ -304,27 +283,44 @@ if __name__ == "__main__":
         trader = connect('swift_trade', 'crT4Y3w9')  
         sleep(5) #wait until connection is successful for further executions
         trader.sub_all_order_book()
-        sell_all_shares(trader)
+        
         #if market is open start data collection and trading individual stocks
-        if market_is_open(trader): 
+        if market_is_open(): 
             print("Start Trading!")
             #Starting data collection in respective file
-            show_summary(trader) 
-            t1 = threading.Thread(target=collect_data, args=(trader, ))
-            t1.start()
+            pf= get_summary()
+            print("Before Order execution summary: ", pf)
+            #Loop through what you wish to continue doing
+            while (END_TIME > trader.get_last_trade_time().time()): 
+                sleep(LOOP_INTERVAL)
+                #check sanity if you are making profits
+                #print current status
+                #place orders 
+                check_sanity()
+                place_orders()
+            
+            print("After Order execution summary: ", get_summary())
 
+            """
+            t1 = threading.Thread(target=collect_data)
+            t1.start()
+            t1.join()
+
+          
             #Create Multiple Threads for each Stock to check
             sleep(100)
             thread_list = []
             for a_stock in trader.get_stock_list():
-                thread = threading.Thread(target=check_stock, args=(trader, a_stock, ))
+                thread = threading.Thread(target=check_stock, args=() a_stock, ))
                 thread_list.append(thread)
                 thread.start()
-           
+            
             t1.join()
+            
             for a_thread in thread_list:
                 a_thread.join() 
-            
+            """
+
         print("DONE")
         trader.disconnect() 
     except Exception as e:
