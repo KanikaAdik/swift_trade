@@ -322,7 +322,7 @@ if __name__ == "__main__":
             #Loop through what you wish to continue doing
             t1 = threading.Thread(target=collect_data)
             t1.start()
-            #sleep(400)
+            sleep(400)
             t2 = threading.Thread(target=run_loop )
             t2.start()
             t1.join()
