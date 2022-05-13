@@ -10,6 +10,7 @@ from time import sleep
 import pandas as pd
 import numpy as np
 import math
+from decimal import Decimal
 
 trader=None
 file_name = os.path.join(os.getcwd(), "CSVFILES")
@@ -179,6 +180,15 @@ def long_position_calls_exceeded(portfolio, ticker): # if long position limit is
     print("i short prosiotn calls:", noofholding  )
     return  noofholding > MAX_POSITION 
 
+
+def toNearest(num, tickSize):
+    """Given a number, round it to the nearest tick. Very useful for sussing float error
+       out of numbers: e.g. toNearest(401.46, 0.01) -> 401.46, whereas processing is
+       normally with floats would give you 401.46000000000004.
+       Use this after adding/subtracting/multiplying numbers."""
+    tickDec = Decimal(str(tickSize))
+    return float((Decimal(round(num / tickSize, 0)) * tickDec))
+
 def check_sanity():
     portfolio = get_summary()
     for ticker in portfolio['stocks']:
@@ -230,7 +240,7 @@ def get_price_offset(index, ticker):
     start_position = start_position_buy if index < 0 else start_position_sell
     # First positions (index 1, -1) should start right at start_position, others should branch from there
     index = index + 1 if index < 0 else index - 1
-    return math.toNearest(start_position * (1 + INTERVAL) ** index)
+    return toNearest(start_position * (1 + INTERVAL) ** index)
 
 def set_quantity_price(index, ticker): #prepare order
     quantity = ORDER_START_SIZE + ((abs(index) - 1) * ORDER_STEP_SIZE)
