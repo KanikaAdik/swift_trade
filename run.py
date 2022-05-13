@@ -276,20 +276,21 @@ def converge_orders(buy_order, sell_order):
         to_create.append(sell_order[sellsmatched])
         sellsmatched += 1 
     if len(to_amend) > 0:
-        for orders in to_amend:
-            if trader.get_order(order[1]['id']).status== 'Status.FILLED':
+        for order in to_amend:
+            print ("ammedn : ", order )
+            if trader.get_order(order['id']).status== 'Status.FILLED':
                 continue
             if  order['type'] in ["Type.LIMIT_BUY", "Type.MARKET_BUY"]:
-                place_order = shift.Order(shift.Order.Type.LIMIT_BUY, orders['stock'], orders['orderQty'], orders['price'])
+                place_order = shift.Order(shift.Order.Type.LIMIT_BUY, order['stock'], order['orderQty'], order['price'])
             if  order['type'] in ["Type.LIMIT_SELL", "Type.MARKET_SELL"]:
-                place_order = shift.Order(shift.Order.Type.LIMIT_SELL, orders['stock'], orders['orderQty'], orders['price'])
-            print("Placing order Type.LIMIT_SELL", orders['stock'], orders['orderQty'], orders['price']  )
+                place_order = shift.Order(shift.Order.Type.LIMIT_SELL, order['stock'], order['orderQty'], order['price'])
+            print("Placing order Type.LIMIT_SELL", order['stock'], order['orderQty'], order['price']  )
             trader.submit_order(place_order)
     if len(to_create) > 0:
-        for order in reversed(to_create):
-            if  order['type'] in ["Type.LIMIT_BUY", "Type.MARKET_BUY"]:
+        for orders in reversed(to_create):
+            if  orders['type'] in ["Type.LIMIT_BUY", "Type.MARKET_BUY"]:
                 place_order = shift.Order(shift.Order.Type.LIMIT_BUY, orders['stock'], orders['orderQty'], orders['price'])
-            if  order['type'] in ["Type.LIMIT_SELL", "Type.MARKET_SELL"]:
+            if  orders['type'] in ["Type.LIMIT_SELL", "Type.MARKET_SELL"]:
                 place_order = shift.Order(shift.Order.Type.LIMIT_SELL, orders['stock'], orders['orderQty'], orders['price'])
             print("Placing order Type.LIMIT_SELL", orders['stock'], orders['orderQty'], orders['price']  )
             trader.submit_order(place_order)
