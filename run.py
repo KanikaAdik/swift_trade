@@ -217,10 +217,10 @@ def place_orders():
                 print(long_position_calls_exceeded(portfolio, ticker))
                 if not long_position_calls_exceeded(portfolio, ticker):
                     print("longpositioncalls done")
-                    buy.append(set_quantity_price(-i, ticker), ticker)
+                    buy.append(set_quantity_price(-i, ticker))
                 if not short_position_calls_exceeded(portfolio, ticker):
                     print("shortpositioncalls done")
-                    sell.append(set_quantity_price(i, ticker), ticker)
+                    sell.append(set_quantity_price(i, ticker))
     return converge_orders(buy, sell)
 
 def get_price_offset(index, ticker, quantity):
@@ -230,7 +230,6 @@ def get_price_offset(index, ticker, quantity):
     #get LOWEST of SELL price 
     #having SPREAD already, get MIN SPREAD to calculate start position to buy & sell 
     #set in a dictionary and resend back with buy or sell call
-    print(ticker)
     filename = os.path.join(file_name,ticker)
     data_collected = pd.read_csv(filename)
     data_collected.dropna(inplace=True)
@@ -246,7 +245,7 @@ def get_price_offset(index, ticker, quantity):
 def set_quantity_price(index, ticker): #prepare order
     quantity = ORDER_START_SIZE + ((abs(index) - 1) * ORDER_STEP_SIZE)
     price = get_price_offset(index, ticker, quantity)
-    return {'price': price, 'orderQty': quantity, 'side': "Buy" if index < 0 else "Sell"}
+    return {'price': price, 'orderQty': quantity, 'side': "Buy" if index < 0 else "Sell", 'stock':ticker}
    
 def converge_orders(buy_order, sell_order):
     existing_orders = get_waitinglistorders()
@@ -271,30 +270,29 @@ def converge_orders(buy_order, sell_order):
         except IndexError:             # Will throw if there isn't a desired order to match. In that case, cancel it.
             to_cancel.append(order)
     while buysmatched < len(buy_order):
-        print (buy_order[buysmatched])
         buy_order[buysmatched].update({"type":"buy"})
-        print(buy_order[buysmatched])
         to_create.append(buy_order[buysmatched])
         buysmatched += 1
     while sellsmatched < len(sell_order):
+        sell_order[sellsmatched].update({"type":"sell"})
         to_create.append(sell_order[sellsmatched])
         sellsmatched += 1 
     if len(to_amend) > 0:
         for order in to_amend:
             if trader.get_order(order['id']).status== 'Status.FILLED':
                 continue
-            if  order['type'] in ["Type.LIMIT_BUY", "Type.MARKET_BUY"]:
+            if  order['type'] =='buy': #in ["Type.LIMIT_BUY", "Type.MARKET_BUY"]:
                 place_order = shift.Order(shift.Order.Type.LIMIT_BUY, order['stock'], order['orderQty'], order['price'])
-            if  order['type'] in ["Type.LIMIT_SELL", "Type.MARKET_SELL"]:
+            if  order['type'] =='sell': #in ["Type.LIMIT_SELL", "Type.MARKET_SELL"]:
                 place_order = shift.Order(shift.Order.Type.LIMIT_SELL, order['stock'], order['orderQty'], order['price'])
             print("Placing order Type.LIMIT_SELL", order['stock'], order['orderQty'], order['price']  )
             trader.submit_order(place_order)
     if len(to_create) > 0:
         for orders in reversed(to_create):
             print(orders)
-            if  orders['type'] in ["Type.LIMIT_BUY", "Type.MARKET_BUY"]:
+            if  orders['type'] =='buy': # in ["Type.LIMIT_BUY", "Type.MARKET_BUY"]:
                 place_order = shift.Order(shift.Order.Type.LIMIT_BUY, orders['stock'], orders['orderQty'], orders['price'])
-            if  orders['type'] in ["Type.LIMIT_SELL", "Type.MARKET_SELL"]:
+            if  orders['type'] =='sell': #in  in ["Type.LIMIT_SELL", "Type.MARKET_SELL"]:
                 place_order = shift.Order(shift.Order.Type.LIMIT_SELL, orders['stock'], orders['orderQty'], orders['price'])
             print("Placing order Type.LIMIT_SELL", orders['stock'], orders['orderQty'], orders['price']  )
             trader.submit_order(place_order)
@@ -324,7 +322,7 @@ if __name__ == "__main__":
             #Loop through what you wish to continue doing
             t1 = threading.Thread(target=collect_data)
             t1.start()
-    
+            sleep(400)
             t2 = threading.Thread(target=run_loop )
             t2.start()
             t1.join()
