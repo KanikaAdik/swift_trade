@@ -85,6 +85,14 @@ def market_is_open():
     #print ("CSV Files created successfully")
     #return True 
 
+def get_price(stock):
+    """
+    Fucntion to - Get the best price of a stock
+    returns Ask price, Bid Price , Ask Size & Bid size 
+    """
+    bp= trader.get_best_price(stock)
+    return bp.get_bid_price(), bp.get_bid_size(), bp.get_ask_price(), bp.get_ask_size()
+
 def collect_data():
     """
     Function to - Collect data on a timely basis until end time occurs
@@ -96,7 +104,7 @@ def collect_data():
         #print("DB collection dozzing off 10 sec...Zzzzz!!!")
         sleep(1) #wait for next 5 sec to update prices in respective csv files
         for stock_symbol in trader.get_stock_list():
-            prices = get_price(stock_symbol)
+            prices = trader.get_price(stock_symbol)
             time = trader.get_last_trade_time().time()
             last_price = trader.get_last_price(stock_symbol)
             entry=[last_price, prices[0], prices[2], prices[1], prices[3], prices[2]-prices[0], time]
@@ -277,6 +285,15 @@ def converge_orders(buy_order, sell_order):
             print("Placing order Type.LIMIT_SELL", orders['stock'], orders['orderQty'], orders['price']  )
             trader.submit_order(place_order)
 
+def run_loop():
+    while (END_TIME > trader.get_last_trade_time().time()): 
+        sleep(LOOP_INTERVAL)
+        #check sanity if you are making profits
+        #print current status
+        #place orders 
+        check_sanity()
+        place_orders()
+
 if __name__ == "__main__":
     #Connect to the Stock Exchange
     try:
@@ -291,31 +308,21 @@ if __name__ == "__main__":
             pf= get_summary()
             print("Before Order execution summary: ", pf)
             #Loop through what you wish to continue doing
-            while (END_TIME > trader.get_last_trade_time().time()): 
-                sleep(LOOP_INTERVAL)
-                #check sanity if you are making profits
-                #print current status
-                #place orders 
-                check_sanity()
-                place_orders()
-            
-            print("After Order execution summary: ", get_summary())
-
-            """
             t1 = threading.Thread(target=collect_data)
             t1.start()
+    
+            t2 = threading.Thread(target=run_loop )
+            t2.start()
             t1.join()
-
-          
+            t2.join()
+            """
             #Create Multiple Threads for each Stock to check
             sleep(100)
             thread_list = []
             for a_stock in trader.get_stock_list():
-                thread = threading.Thread(target=check_stock, args=() a_stock, ))
+                thread = threading.Thread(target=run_loop ))
                 thread_list.append(thread)
                 thread.start()
-            
-            t1.join()
             
             for a_thread in thread_list:
                 a_thread.join() 
