@@ -79,7 +79,7 @@ def market_is_open():
     os.mkdir(PATH)
     print("Directory created successfully -", PATH)
     for stock_symbol in trader.get_stock_list():
-        with open(os.path.join(PATH,stock_symbol,".csv"),  'w') as csvfile:
+        with open(os.path.join(PATH,stock_symbol+".csv"),  'w') as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(['Last Price', 'Bid Price','Ask Price', 'Bid Volume','Ask Volume', 'Spread', 'Time']) 
     print ("CSV Files created successfully")
@@ -322,7 +322,7 @@ if __name__ == "__main__":
             #Loop through what you wish to continue doing
             t1 = threading.Thread(target=collect_data)
             t1.start()
-            sleep(400)
+            #sleep(400)
             t2 = threading.Thread(target=run_loop )
             t2.start()
             t1.join()
