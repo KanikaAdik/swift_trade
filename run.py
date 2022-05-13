@@ -78,7 +78,7 @@ def market_is_open():
     os.mkdir(PATH)
     print("Directory created successfully -", PATH)
     for stock_symbol in trader.get_stock_list():
-        with open(os.path.join(PATH,stock_symbol+".csv"),  'w') as csvfile:
+        with open(os.path.join(PATH,stock_symbol),  'w') as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(['Last Price', 'Bid Price','Ask Price', 'Bid Volume','Ask Volume', 'Spread', 'Time']) 
     print ("CSV Files created successfully")
@@ -103,7 +103,7 @@ def collect_data():
         #print("DB collection dozzing off 10 sec...Zzzzz!!!")
         sleep(1) #wait for next 5 sec to update prices in respective csv files
         for stock_symbol in trader.get_stock_list():
-            prices = trader.get_price(stock_symbol)
+            prices = get_price(stock_symbol)
             time = trader.get_last_trade_time().time()
             last_price = trader.get_last_price(stock_symbol)
             entry=[last_price, prices[0], prices[2], prices[1], prices[3], prices[2]-prices[0], time]
@@ -223,9 +223,9 @@ def get_price_offset(index, ticker):
     print(ticker)
     filename = os.path.join(file_name,ticker)
     data_collected = pd.read_csv(filename)
-    current_spread = round(data_collected['Spread'].mean,2)  
-    start_position_buy = data_collected['Bid Price'].min  + current_spread
-    start_position_sell = data_collected['Ask Price'].max - current_spread
+    current_spread = round(data_collected['Spread'].mean(),2)  
+    start_position_buy = data_collected['Bid Price'].min()  + current_spread
+    start_position_sell = data_collected['Ask Price'].max() - current_spread
 
     start_position = start_position_buy if index < 0 else start_position_sell
     # First positions (index 1, -1) should start right at start_position, others should branch from there
