@@ -223,7 +223,7 @@ def place_orders():
                     sell.append(set_quantity_price(i, ticker))
     return converge_orders(buy, sell)
 
-def get_price_offset(index, ticker):
+def get_price_offset(index, ticker, quantity):
     #read the CSV's  for a single TICKER 
     #calcualte mean of the SPREAD to calculate BUY& SELL
     #Get HIGHEST of BUY Call
@@ -240,11 +240,11 @@ def get_price_offset(index, ticker):
     start_position = start_position_buy if index < 0 else start_position_sell
     # First positions (index 1, -1) should start right at start_position, others should branch from there
     index = index + 1 if index < 0 else index - 1
-    return toNearest(start_position * (1 + INTERVAL) ** index)
+    return toNearest(start_position * (1 + INTERVAL) ** index,quantity )
 
 def set_quantity_price(index, ticker): #prepare order
     quantity = ORDER_START_SIZE + ((abs(index) - 1) * ORDER_STEP_SIZE)
-    price = get_price_offset(index, ticker)
+    price = get_price_offset(index, ticker, quantity)
     return {'price': price, 'orderQty': quantity, 'side': "Buy" if index < 0 else "Sell"}
    
 def converge_orders(buy_order, sell_order):
@@ -279,17 +279,17 @@ def converge_orders(buy_order, sell_order):
         for orders in to_amend:
             if trader.get_order(order[1]['id']).status== 'Status.FILLED':
                 continue
-            if  order[1]['type'] in ["Type.LIMIT_BUY", "Type.MARKET_BUY"]:
+            if  order['type'] in ["Type.LIMIT_BUY", "Type.MARKET_BUY"]:
                 place_order = shift.Order(shift.Order.Type.LIMIT_BUY, orders['stock'], orders['orderQty'], orders['price'])
-            if  order[1]['type'] in ["Type.LIMIT_SELL", "Type.MARKET_SELL"]:
+            if  order['type'] in ["Type.LIMIT_SELL", "Type.MARKET_SELL"]:
                 place_order = shift.Order(shift.Order.Type.LIMIT_SELL, orders['stock'], orders['orderQty'], orders['price'])
             print("Placing order Type.LIMIT_SELL", orders['stock'], orders['orderQty'], orders['price']  )
             trader.submit_order(place_order)
     if len(to_create) > 0:
         for order in reversed(to_create):
-            if  order[1]['type'] in ["Type.LIMIT_BUY", "Type.MARKET_BUY"]:
+            if  order['type'] in ["Type.LIMIT_BUY", "Type.MARKET_BUY"]:
                 place_order = shift.Order(shift.Order.Type.LIMIT_BUY, orders['stock'], orders['orderQty'], orders['price'])
-            if  order[1]['type'] in ["Type.LIMIT_SELL", "Type.MARKET_SELL"]:
+            if  order['type'] in ["Type.LIMIT_SELL", "Type.MARKET_SELL"]:
                 place_order = shift.Order(shift.Order.Type.LIMIT_SELL, orders['stock'], orders['orderQty'], orders['price'])
             print("Placing order Type.LIMIT_SELL", orders['stock'], orders['orderQty'], orders['price']  )
             trader.submit_order(place_order)
